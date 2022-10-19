@@ -14,21 +14,8 @@ typedef struct _Stats {
     double dev;
 } Stats;
 
-typedef struct _TopStats {
-    int best_region;
-    int best_city[2];
-    double best_region_avg;
-    double best_city_avg;
-} TopStats;
-
-
 void print_stats(int min, int max, double med, double avg, double dev) {
     printf("menor: %d, maior: %d, mediana: %.2lf, média: %.2lf e DP: %.2lf\n", min, max, med, avg, dev);
-}
-
-int cmpint (const void *a, const void *b) {
-   const int *A = a, *B = b;
-   return *A - *B;
 }
 
 double median_even(int *scores, int start, int end) {
