@@ -63,11 +63,9 @@ int main(void) {
     
     scanf("%d %d %d %d", &n_regions, &n_cities, &n_students, &seed);
 
-    clock_t start=clock();
-    int scores[n_regions * n_cities * n_students];
-
-
     srand(seed);
+    
+    int scores[n_regions * n_cities * n_students];
     for (int i = 0; i < n_regions * n_cities * n_students; i++) {
         scores[i] = rand() % 101;
     }
@@ -80,6 +78,8 @@ int main(void) {
     
     int best_region = n_regions * n_cities;
     int best_city[2] = {0, 0};
+
+    clock_t start=clock();
     for (int i = 0; i < n_regions; i++) {
         for (int j = 0; j < n_cities; j++) {
             // Per city
