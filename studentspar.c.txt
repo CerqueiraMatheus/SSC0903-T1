@@ -1,0 +1,29 @@
+
+# Preparativos
+students, cities, regions, sedd
+stats
+2 score array (memcpy)
+best_region, best_city[2]
+3 medfuncs
+...
+
+# Seção Paralela
+## 2 tasks paralelas
+1 Calcular médias e desvios padrões
+1.1.1 - Pra cada cidade, for loop calculando a média
+1.1.2 - A partir da média, for loop calculando a mediana
+1.2.1 - Pra cada região, for loop calculando a média, a partir das médias anteriores
+1.2.2 - A partir da média, for loop calculando a mediana
+1.3.1 - Pra nação, for loop calculando a média a partir das médias anteriores
+1.3.2 - A partir da média, for loop calculando a mediana
+
+2 Ordenar, calcular mediana, menor e maior (k-way merge sort)
+2.1.1 Pra cada cidade, executamos um merge-sort comum
+2.1.2 Pra cada cidade, calculamos o mínimo, a mediana e o máximo
+2.2.1 Pra cada região, criamos uma priority queue com a tupla (valor, cidade) e realizamos um k-way merge, onde k = n_cities
+2.2.2 Pra cada região, calculamos o mínimo, a mediana e o máximo
+2.3.1 Pra nação, criamos uma priority queue com a tupla (valor, região) e realizamos um k-way merge, onde k = n_regions
+2.3.2 Pra nação, calculamos o mínimo, a mediana e o máximo
+
+# Finalização
+Imprimir resultados
