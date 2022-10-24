@@ -25,7 +25,8 @@ typedef struct _Heap {
 int compare_tuple(HeapTuple *a, HeapTuple *b);
 
 void merge_sorted_lists(int *scores, int start, int n_lists, int n_elems);
-void merge_sort(int *scores, int left, int mid, int right);
+void merge_sort(int scores[], int left, int right);
+void merge(int *scores, int left, int mid, int right);
 void partition(int *scores, int left, int right);
 
 Heap *heap_init(int heapsize);
@@ -69,8 +70,6 @@ double std_dev(int *scores, int avg, int start, int end) {
 typedef double (*medfn) (int *scores, int start, int end);
 
 void get_stats(int *scores, Stats *stats, medfn medfunc, int curr_start, int n_items) {
-    partition(scores, curr_start, curr_start + n_items - 1);
-
     stats->min = scores[curr_start];
     stats->max = scores[curr_start + n_items - 1];
     stats->med = medfunc(scores, curr_start, curr_start + n_items - 1);
@@ -78,94 +77,86 @@ void get_stats(int *scores, Stats *stats, medfn medfunc, int curr_start, int n_i
     stats->dev = std_dev(scores, stats->avg, curr_start, curr_start + n_items - 1);
 }
 
-// int main(void) {
-//     int n_regions, n_cities, n_students, seed;
-    
-//     scanf("%d %d %d %d", &n_regions, &n_cities, &n_students, &seed);
-
-//     srand(seed);
-    
-//     int scores[n_regions * n_cities * n_students];
-//     for (int i = 0; i < n_regions * n_cities * n_students; i++) {
-//         scores[i] = rand() % 101;
-//     }
-
-//     medfn medfunc_city = n_students % 2 ? median_odd : median_even;
-//     medfn medfunc_region = n_cities % 2 ? medfunc_city : median_even;
-//     medfn medfunc_global = n_regions % 2 ? medfunc_region : median_even;
-
-//     Stats stats[1 + n_regions + n_cities * n_regions ]; // Per city, per region and global stats
-    
-//     int best_region = n_regions * n_cities;
-//     int best_city[2] = {0, 0};
-
-//     clock_t start=clock();
-//     for (int i = 0; i < n_regions; i++) {
-//         for (int j = 0; j < n_cities; j++) {
-//             // Per city
-//             int curr_city = (i * n_cities * n_students) + (j * n_students);
-//             get_stats(scores, &(stats[i * n_cities + j]), medfunc_city, curr_city, n_students);
-            
-//             if (stats[i * n_cities + j].avg > stats[best_city[0] * n_cities + best_city[1]].avg) {
-//                 best_city[0] = i;
-//                 best_city[1] = j;
-//             }
-//         }
-//         // Per region
-//         int curr_region = (i * n_cities * n_students);
-//         get_stats(scores, &(stats[n_regions * n_cities + i]), medfunc_region, curr_region, n_cities * n_students);
-
-//         if (stats[n_regions * n_cities + i].avg > stats[n_regions * n_cities + best_region].avg) {
-//             best_region = i;
-//         }
-//     }
-
-//     // Global
-//     get_stats(scores, &(stats[n_regions * n_cities + n_regions]), medfunc_global, 0, n_regions * n_cities * n_students);
-//     clock_t stop = clock();
-
-//     for (int i = 0; i < n_regions; i++) {
-//         for (int j = 0; j < n_cities; j++) {
-//             printf("Reg %d - Cid %d: ", i, j);
-//             print_stats(stats[i * n_cities + j].min, stats[i * n_cities + j].max, 
-//                         stats[i * n_cities + j].med, stats[i * n_cities + j].avg, 
-//                         stats[i * n_cities + j].dev);
-//         }
-//         printf("\n");
-//     }
-
-//     for (int i = 0; i < n_regions; i++) {
-//         if (stats[n_regions * n_cities + i].avg > stats[best_region].avg) {
-
-//         }
-//         printf("Reg %d: ", i);
-//         print_stats(stats[n_regions * n_cities + i].min, stats[n_regions * n_cities + i].max, 
-//                     stats[n_regions * n_cities + i].med, stats[n_regions * n_cities + i].avg, 
-//                     stats[n_regions * n_cities + i].dev);
-//     }
-//     printf("\n");
-
-//     printf("Brasil: ");
-//     print_stats(stats[n_regions * n_cities + n_regions].min, stats[n_regions * n_cities + n_regions].max, 
-//                 stats[n_regions * n_cities + n_regions].med, stats[n_regions * n_cities + n_regions].avg, 
-//                 stats[n_regions * n_cities + n_regions].dev);
-
-//     printf("\n");
-//     printf("Melhor regiao: Regiao %d\n", best_region);
-//     printf("Melhor cidade: Regiao %d, Cidade %d\n", best_city[0], best_city[1]);
-
-//     printf("\n");
-//     printf("Tempo de resposta sem considerar E/S, em segundos: %.4fs\n", (double)(stop-start)/CLOCKS_PER_SEC);
-// }
-
 int main(void) {
-    int scores[12] = {1, 3, 5, 7, 2, 8, 10, 11, 4, 6, 9, 12};
-    merge_sorted_lists(scores, 0, 3, 4);
+    int n_regions, n_cities, n_students, seed;
     
-    printf("\n\n");
-    for (int i = 0; i < 12; i++)
-        printf("%d ", scores[i]);
-    printf("\n\n");
+    scanf("%d %d %d %d", &n_regions, &n_cities, &n_students, &seed);
+
+    srand(seed);
+    
+    int scores[n_regions * n_cities * n_students];
+    for (int i = 0; i < n_regions * n_cities * n_students; i++) {
+        scores[i] = rand() % 101;
+    }
+
+    medfn medfunc_city = n_students % 2 ? median_odd : median_even;
+    medfn medfunc_region = n_cities % 2 ? medfunc_city : median_even;
+    medfn medfunc_global = n_regions % 2 ? medfunc_region : median_even;
+
+    Stats stats[1 + n_regions + n_cities * n_regions ]; // Per city, per region and global stats
+    
+    int best_region = n_regions * n_cities;
+    int best_city[2] = {0, 0};
+
+    clock_t start=clock();
+    for (int i = 0; i < n_regions; i++) {
+        for (int j = 0; j < n_cities; j++) {
+            // Per city
+            int curr_city = (i * n_cities * n_students) + (j * n_students);
+            merge_sort(scores, curr_city, curr_city + n_students - 1);
+            get_stats(scores, &(stats[i * n_cities + j]), medfunc_city, curr_city, n_students);
+            
+            if (stats[i * n_cities + j].avg > stats[best_city[0] * n_cities + best_city[1]].avg) {
+                best_city[0] = i;
+                best_city[1] = j;
+            }
+        }
+        // Per region
+        int curr_region = (i * n_cities * n_students);
+        merge_sorted_lists(scores, curr_region, n_cities, n_students);
+        get_stats(scores, &(stats[n_regions * n_cities + i]), medfunc_region, curr_region, n_cities * n_students);
+
+        if (stats[n_regions * n_cities + i].avg > stats[n_regions * n_cities + best_region].avg) {
+            best_region = i;
+        }
+    }
+
+    // Global
+    get_stats(scores, &(stats[n_regions * n_cities + n_regions]), medfunc_global, 0, n_regions * n_cities * n_students);
+    clock_t stop = clock();
+
+    for (int i = 0; i < n_regions; i++) {
+        for (int j = 0; j < n_cities; j++) {
+            printf("Reg %d - Cid %d: ", i, j);
+            print_stats(stats[i * n_cities + j].min, stats[i * n_cities + j].max, 
+                        stats[i * n_cities + j].med, stats[i * n_cities + j].avg, 
+                        stats[i * n_cities + j].dev);
+        }
+        printf("\n");
+    }
+
+    for (int i = 0; i < n_regions; i++) {
+        if (stats[n_regions * n_cities + i].avg > stats[best_region].avg) {
+
+        }
+        printf("Reg %d: ", i);
+        print_stats(stats[n_regions * n_cities + i].min, stats[n_regions * n_cities + i].max, 
+                    stats[n_regions * n_cities + i].med, stats[n_regions * n_cities + i].avg, 
+                    stats[n_regions * n_cities + i].dev);
+    }
+    printf("\n");
+
+    printf("Brasil: ");
+    print_stats(stats[n_regions * n_cities + n_regions].min, stats[n_regions * n_cities + n_regions].max, 
+                stats[n_regions * n_cities + n_regions].med, stats[n_regions * n_cities + n_regions].avg, 
+                stats[n_regions * n_cities + n_regions].dev);
+
+    printf("\n");
+    printf("Melhor regiao: Regiao %d\n", best_region);
+    printf("Melhor cidade: Regiao %d, Cidade %d\n", best_city[0], best_city[1]);
+
+    printf("\n");
+    printf("Tempo de resposta sem considerar E/S, em segundos: %.4fs\n", (double)(stop-start)/CLOCKS_PER_SEC);
 }
 
 void merge_sorted_lists(int *scores, int start, int n_lists, int n_elems) {
@@ -187,8 +178,8 @@ void merge_sorted_lists(int *scores, int start, int n_lists, int n_elems) {
         sorted_scores[curr_pos++] = aux.data;
 
         curr_idx_lists[aux.list_idx]++;
-        if (curr_idx_lists[aux.list_idx] < n_elems - 1) {
-            aux.data = curr_idx_lists[aux.list_idx];
+        if (curr_idx_lists[aux.list_idx] < n_elems) {
+            aux.data = scores[aux.list_idx * n_elems + curr_idx_lists[aux.list_idx]];
             heap_insert(heap, aux);
         }
     }
@@ -201,7 +192,7 @@ void merge_sorted_lists(int *scores, int start, int n_lists, int n_elems) {
     }
 }
 
-void merge_sort(int scores[], int left, int mid, int right) {
+void merge(int scores[], int left, int mid, int right) {
     int i, j, k;
     int n1 = mid - left + 1;
     int n2 = right - mid;
@@ -248,15 +239,19 @@ void partition(int scores[], int left, int right) {
         partition(scores, left, m);
         partition(scores, m + 1, right);
  
-        merge_sort(scores, left, m, right);
+        merge(scores, left, m, right);
     }
+}
+
+void merge_sort(int scores[], int left, int right) {
+    partition(scores, left, right);
 }
 
 /*Initialize Heap*/
 Heap *heap_init(int heapsize) {
     Heap *heap = calloc(1, sizeof(Heap));
 
-    heap->array = calloc(heapsize + 1, sizeof(int));
+    heap->array = calloc(heapsize + 1, sizeof(HeapTuple));
     heap->array[0].data = -INT_MAX;
     heap->array[0].list_idx = -INT_MAX;
 

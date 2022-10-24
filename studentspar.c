@@ -4,7 +4,7 @@
 #include <time.h>
 #include <omp.h>
 
-void merge_sort(int *scores, int left, int mid, int right);
+void merge(int *scores, int left, int mid, int right);
 void partition(int *scores, int left, int right);
 
 typedef struct _Stats {
@@ -140,7 +140,7 @@ int main(void) {
     printf("Tempo de resposta sem considerar E/S, em segundos: %.4fs\n", (double)(stop-start)/CLOCKS_PER_SEC);
 }
 
-void merge_sort(int scores[], int left, int mid, int right) {
+void merge(int scores[], int left, int mid, int right) {
     int i, j, k;
     int n1 = mid - left + 1;
     int n2 = right - mid;
@@ -187,6 +187,6 @@ void partition(int scores[], int left, int right) {
         partition(scores, left, m);
         partition(scores, m + 1, right);
  
-        merge_sort(scores, left, m, right);
+        merge(scores, left, m, right);
     }
 }
