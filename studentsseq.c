@@ -9,7 +9,7 @@ typedef struct _Stats {
     int max;
     double med;
     double avg;
-    double dev;
+    double var;
 } Stats;
 
 void print_stats(int min, int max, double med, double avg, double dev) {
@@ -36,7 +36,7 @@ int max(int *scores, int start, int end) {
     return max;
 }
 
-double median_even(int *scores, int start, int end) {
+double median(int *scores, int start, int end) {
     int buckets[101] = { 0 };
     for (int i = start; i <= end; i++)
         buckets[scores[i]]++;
@@ -57,19 +57,6 @@ double median_even(int *scores, int start, int end) {
     }
 
     return (double) (left + right) / 2;
-}
-
-double median_odd(int *scores, int start, int end) {
-    int buckets[101] = { 0 };
-    for (int i = start; i <= end; i++)
-        buckets[scores[i]]++;
-    
-    int i, curr_idx = -1;
-    for (i = 0; i <= 100 && curr_idx < (end - start) / 2; i++) {
-        curr_idx += buckets[i];
-    }
-
-    return (double) i - 1;
 }
 
 double average(int *scores, int start, int end) {
@@ -93,12 +80,12 @@ double std_dev(int *scores, int avg, int start, int end) {
 
 typedef double (*medfn) (int *scores, int start, int end);
 
-void get_stats(int *scores, Stats *stats, medfn medfunc, int curr_start, int n_items) {
+void get_stats(int *scores, Stats *stats, int curr_start, int n_items) {
     stats->min = min(scores, curr_start, curr_start + n_items - 1);
     stats->max = max(scores, curr_start, curr_start + n_items - 1);
-    stats->med = medfunc(scores, curr_start, curr_start + n_items - 1);
+    stats->med = median(scores, curr_start, curr_start + n_items - 1);
     stats->avg = average(scores, curr_start, curr_start + n_items - 1);
-    stats->dev = std_dev(scores, stats->avg, curr_start, curr_start + n_items - 1);
+    stats->var = std_dev(scores, stats->avg, curr_start, curr_start + n_items - 1);
 }
 
 int main(void) {
@@ -113,10 +100,6 @@ int main(void) {
         scores[i] = rand() % 101;
     }
 
-    medfn medfunc_city = n_students % 2 ? median_odd : median_even;
-    medfn medfunc_region = n_cities % 2 ? medfunc_city : median_even;
-    medfn medfunc_global = n_regions % 2 ? medfunc_region : median_even;
-
     Stats stats[1 + n_regions + n_cities * n_regions ]; // Per city, per region and global stats
     
     int best_region = n_regions * n_cities;
@@ -127,7 +110,7 @@ int main(void) {
         for (int j = 0; j < n_cities; j++) {
             // Per city
             int curr_city = (i * n_cities * n_students) + (j * n_students);
-            get_stats(scores, &(stats[i * n_cities + j]), medfunc_city, curr_city, n_students);
+            get_stats(scores, &(stats[i * n_cities + j]), curr_city, n_students);
             
             if (stats[i * n_cities + j].avg > stats[best_city[0] * n_cities + best_city[1]].avg) {
                 best_city[0] = i;
@@ -136,7 +119,7 @@ int main(void) {
         }
         // Per region
         int curr_region = (i * n_cities * n_students);
-        get_stats(scores, &(stats[n_regions * n_cities + i]), medfunc_region, curr_region, n_cities * n_students);
+        get_stats(scores, &(stats[n_regions * n_cities + i]), curr_region, n_cities * n_students);
 
         if (stats[n_regions * n_cities + i].avg > stats[n_regions * n_cities + best_region].avg) {
             best_region = i;
@@ -144,7 +127,7 @@ int main(void) {
     }
 
     // Global
-    get_stats(scores, &(stats[n_regions * n_cities + n_regions]), medfunc_global, 0, n_regions * n_cities * n_students);
+    get_stats(scores, &(stats[n_regions * n_cities + n_regions]), 0, n_regions * n_cities * n_students);
     clock_t stop = clock();
 
     for (int i = 0; i < n_regions; i++) {
@@ -152,7 +135,7 @@ int main(void) {
             printf("Reg %d - Cid %d: ", i, j);
             print_stats(stats[i * n_cities + j].min, stats[i * n_cities + j].max, 
                         stats[i * n_cities + j].med, stats[i * n_cities + j].avg, 
-                        stats[i * n_cities + j].dev);
+                        stats[i * n_cities + j].var);
         }
         printf("\n");
     }
@@ -164,14 +147,14 @@ int main(void) {
         printf("Reg %d: ", i);
         print_stats(stats[n_regions * n_cities + i].min, stats[n_regions * n_cities + i].max, 
                     stats[n_regions * n_cities + i].med, stats[n_regions * n_cities + i].avg, 
-                    stats[n_regions * n_cities + i].dev);
+                    stats[n_regions * n_cities + i].var);
     }
     printf("\n");
 
     printf("Brasil: ");
     print_stats(stats[n_regions * n_cities + n_regions].min, stats[n_regions * n_cities + n_regions].max, 
                 stats[n_regions * n_cities + n_regions].med, stats[n_regions * n_cities + n_regions].avg, 
-                stats[n_regions * n_cities + n_regions].dev);
+                stats[n_regions * n_cities + n_regions].var);
 
     printf("\n");
     printf("Melhor regiao: Regiao %d\n", best_region);
