@@ -98,6 +98,12 @@ int main(void) {
     int scores[n_regions * n_cities * n_students];
     for (int i = 0; i < n_regions * n_cities * n_students; i++) {
         scores[i] = rand() % 101;
+
+        
+        printf("%d - ", scores[i]);
+
+        if ((i + 1) % n_students == 0)
+            printf("\n");
     }
 
     Stats stats[1 + n_regions + n_cities * n_regions ]; // Per city, per region and global stats
