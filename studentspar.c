@@ -35,8 +35,16 @@ typedef struct Avg {
     omp_out.n = omp_out.n + omp_in.n) \
     initializer( omp_priv = { 0, INT_MAX, INT_MIN, 0, 0, 0 })
 
+void reduce_stats(Stats* regional_stats, Stats* local_stats) {
+    regional_stats->min = (regional_stats->min <= local_stats->min ? regional_stats->min : local_stats->min);
+    regional_stats->max = (regional_stats->max >= local_stats->max ? regional_stats->max : local_stats->max);
+    regional_stats->var = regional_stats->n == 0 ? local_stats->var : ((regional_stats->var * regional_stats->n + local_stats->var * local_stats->n) / (regional_stats->n + local_stats->n)) + ((regional_stats->n * local_stats->n * ((regional_stats->avg - local_stats->avg)*(regional_stats->avg - local_stats->avg))) / ((regional_stats->n + local_stats->n)*(regional_stats->n + local_stats->n)));
+    regional_stats->avg = regional_stats->n == 0 ? local_stats->avg : (regional_stats->n * regional_stats->avg + local_stats->n * local_stats->avg) / (regional_stats->n + local_stats->n);
+    regional_stats->n = regional_stats->n + local_stats->n;
+}
+
 void print_stats(Stats stats) {
-    printf("menor: %d, maior: %d, mediana: %.2lf, média: %.8lf e DP: %.2lf\n", stats.min, stats.max, stats.med, stats.avg, sqrt(stats.var));
+    printf("menor: %d, maior: %d, mediana: %.2lf, média: %.2lf e DP: %.2lf\n", stats.min, stats.max, stats.med, stats.avg, sqrt(stats.var));
 }
 
 void counting_sort(int *scores, int* buckets, int* local_buckets, int start, int end) {
@@ -123,10 +131,11 @@ int main(void) {
         scores[i] = rand() % 101;
     }
 
-    int global_buckets[N_SCORES] = { 0 };
     Stats *stats = calloc(n_cities * n_regions + n_regions + 1, sizeof(Stats));
-    Stats curr_stats = { 0, INT_MAX, INT_MIN, 0, 0, 0 };
     Avg best_city = { 0, 0 }, best_region = { 0, 0 };
+
+    int global_buckets[N_SCORES] = { 0 };
+    Stats global_stats = { 0, INT_MAX, INT_MIN, 0, 0, 0 };
 
     double start= omp_get_wtime();
     omp_set_nested(2);
@@ -134,32 +143,30 @@ int main(void) {
     #pragma omp parallel for \
             default(none) \
             shared(n_regions, n_cities, n_students, scores, stats) \
-            reduction(reduce_stats: curr_stats) \
+            reduction(reduce_stats: global_stats) \
             reduction(+: global_buckets) \
             reduction(best: best_region) \
             reduction(best: best_city)
     for (int i = 0; i < n_regions; i++) {
         int regional_buckets[N_SCORES] = { 0 };
-        curr_stats = (Stats){ 0, INT_MAX, INT_MIN, 0, 0, 0 };
+        Stats regional_stats = { 0, INT_MAX, INT_MIN, 0, 0, 0 };
         
         #pragma omp parallel for \
             default(none) \
             shared(n_regions, n_cities, n_students, scores, stats) \
             firstprivate(i) \
-            reduction(reduce_stats: curr_stats) \
+            reduction(reduce_stats: regional_stats) \
             reduction(+: regional_buckets) \
             reduction(best: best_city) 
         for (int j = 0; j < n_cities; j++) {
             int local_buckets[N_SCORES] = { 0 };
-            curr_stats = (Stats){ 0, INT_MAX, INT_MIN, 0, 0, 0 };
-
 
             int curr_city = (i * n_cities * n_students) + (j * n_students);
 
             counting_sort(scores, regional_buckets, local_buckets, curr_city, curr_city + n_students - 1);
 
             double avg = get_avg(local_buckets, n_students);
-            curr_stats = (Stats){ 
+            Stats local_stats = (Stats){ 
                 .n = n_students, 
                 .min = get_min(local_buckets),
                 .max = get_max(local_buckets), 
@@ -167,30 +174,33 @@ int main(void) {
                 .avg = avg,
                 .var = get_var(local_buckets, avg, n_students) 
             };
-            
-            stats[i * n_cities + j] = curr_stats;
 
-            if (curr_stats.avg > best_city.avg) {
-                best_city.avg = curr_stats.avg;
+            reduce_stats(&regional_stats, &local_stats);
+            
+            if (local_stats.avg > best_city.avg) {
+                best_city.avg = local_stats.avg;
                 best_city.pos = i * n_cities + j;
             }
+
+            stats[i * n_cities + j] = local_stats;
         }
 
+        reduce_stats(&global_stats, &regional_stats);
 
-        curr_stats.med = get_median(regional_buckets, n_cities * n_students);
-        stats[n_regions * n_cities + i] = curr_stats;
+        regional_stats.med = get_median(regional_buckets, n_cities * n_students);
+        stats[n_regions * n_cities + i] = regional_stats;
         
         for (int i = 0; i < N_SCORES; i++)
             global_buckets[i] += regional_buckets[i];
 
-        if (curr_stats.avg > best_region.avg) {
-            best_region.avg = curr_stats.avg;
+        if (regional_stats.avg > best_region.avg) {
+            best_region.avg = regional_stats.avg;
             best_region.pos = i;
         }
     } // End of parallel section
 
-    curr_stats.med = get_median(global_buckets, n_regions * n_cities * n_students);
-    stats[n_regions * n_cities + n_regions] = curr_stats;
+    global_stats.med = get_median(global_buckets, n_regions * n_cities * n_students);
+    stats[n_regions * n_cities + n_regions] = global_stats;
 
     double stop = omp_get_wtime();
 

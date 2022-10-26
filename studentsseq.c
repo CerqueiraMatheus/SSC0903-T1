@@ -14,7 +14,7 @@ typedef struct _Stats {
 } Stats;
 
 void print_stats(int min, int max, double med, double avg, double dev) {
-    printf("menor: %d, maior: %d, mediana: %.2lf, média: %.8lf e DP: %.2lf\n", min, max, med, avg, dev);
+    printf("menor: %d, maior: %d, mediana: %.2lf, média: %.2lf e DP: %.2lf\n", min, max, med, avg, dev);
 }
 
 int min(int *scores, int start, int end) {
@@ -62,11 +62,13 @@ double median(int *scores, int start, int end) {
 
 double average(int *scores, int start, int end) {
     int summ = 0;
+    int n_items = (end - start + 1);
+
     for (int i = start; i <= end; i++) {
-        summ += scores[i];
+        summ += scores[i] / n_items;
     }
 
-    return (double) summ / (end - start + 1);
+    return (double) summ / n_items;
 }
 
 double std_dev(int *scores, int avg, int start, int end) {

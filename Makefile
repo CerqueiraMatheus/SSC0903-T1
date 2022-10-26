@@ -1,8 +1,8 @@
 seq:
-	gcc studentsseq.c -g -Wall -Werror -lm -fopenmp -O3
+	gcc studentsseq.c -g -Wall -Werror -lm -fopenmp -Ofast
 
 par:
-	gcc studentspar.c -g -Wall -Werror -lm -fopenmp -O3
+	gcc studentspar.c -g -Wall -Werror -lm -fopenmp -Ofast
 
 run:
 	./a.out
