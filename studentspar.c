@@ -35,10 +35,8 @@ typedef struct Avg {
     omp_out.n = omp_out.n + omp_in.n) \
     initializer( omp_priv = { 0, INT_MAX, INT_MIN, 0, 0, 0 })
 
-   // omp_out.var = 
-
 void print_stats(Stats stats) {
-    printf("menor: %d, maior: %d, mediana: %.2lf, média: %.2lf e DP: %.2lf\n", stats.min, stats.max, stats.med, stats.avg, sqrt(stats.var));
+    printf("menor: %d, maior: %d, mediana: %.2lf, média: %.8lf e DP: %.2lf\n", stats.min, stats.max, stats.med, stats.avg, sqrt(stats.var));
 }
 
 void counting_sort(int *scores, int* buckets, int* local_buckets, int start, int end) {
