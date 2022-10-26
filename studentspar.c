@@ -1,3 +1,4 @@
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
@@ -8,7 +9,7 @@
 #define N_SCORES 101
 
 typedef struct _Stats {
-    int n;
+    double n;
     int min;
     int max;
     double med;
@@ -16,23 +17,35 @@ typedef struct _Stats {
     double var;
 } Stats;
 
+typedef struct Avg {
+    int pos;
+    double avg;
+} Avg;
+
+#pragma omp declare reduction(best: Avg: \
+    omp_out.avg = (omp_in.avg >= omp_out.avg ? omp_in.avg : omp_out.avg), \
+    omp_out.pos = (omp_in.avg >= omp_out.avg ? omp_in.pos : omp_out.pos)) \
+    initializer( omp_priv = { 0, 0 })
+
 #pragma omp declare reduction(reduce_stats: Stats: \
-    omp_out.min = omp_out.min <= omp_in.min ? omp_out.min : omp_in.min, \
-    omp_out.max = omp_out.max >= omp_in.max ? omp_out.max : omp_in.max, \
-    omp_out.var = ((omp_out.var * omp_out.n + omp_in.var * omp_in.n) / (omp_out.n + omp_in.n)) + ((omp_out.n * omp_in.n * ((omp_out.avg - omp_in.avg)*(omp_out.avg - omp_in.avg))) / ((omp_out.n + omp_in.n)*(omp_out.n + omp_in.n))), \
-    omp_out.avg = (omp_out.avg + omp_in.avg) / 2, \
-    omp_out.n += omp_in.n) \
+    omp_out.min = (omp_out.min <= omp_in.min ? omp_out.min : omp_in.min), \
+    omp_out.max = (omp_out.max >= omp_in.max ? omp_out.max : omp_in.max), \
+    omp_out.var = omp_out.n == 0 ? omp_in.var : ((omp_out.var * omp_out.n + omp_in.var * omp_in.n) / (omp_out.n + omp_in.n)) + ((omp_out.n * omp_in.n * ((omp_out.avg - omp_in.avg)*(omp_out.avg - omp_in.avg))) / ((omp_out.n + omp_in.n)*(omp_out.n + omp_in.n))), \
+    omp_out.avg = omp_out.n == 0 ? omp_in.avg : (omp_out.n * omp_out.avg + omp_in.n * omp_in.avg) / (omp_out.n + omp_in.n), \
+    omp_out.n = omp_out.n + omp_in.n) \
     initializer( omp_priv = { 0, INT_MAX, INT_MIN, 0, 0, 0 })
+
+   // omp_out.var = 
 
 void print_stats(Stats stats) {
     printf("menor: %d, maior: %d, mediana: %.2lf, média: %.2lf e DP: %.2lf\n", stats.min, stats.max, stats.med, stats.avg, sqrt(stats.var));
 }
 
-int *counting_sort(int *scores, int* buckets, int start, int end) {
-    for (int i = start; i <= end; i++)
+void counting_sort(int *scores, int* buckets, int* local_buckets, int start, int end) {
+    for (int i = start; i <= end; i++) {
         buckets[scores[i]]++;
-
-    return buckets;
+        local_buckets[scores[i]]++;
+    }
 }
 
 int get_min(int *buckets) {
@@ -91,74 +104,99 @@ double get_var(int *buckets, int avg, int n_elems) {
     return res / n_elems;
 }
 
+void print_buckets(int *buckets) {
+    for (int i = 0; i < N_SCORES; i++)
+        printf("b[%d]=%d - ", i, buckets[i]);
+
+    printf("\n");
+}
+
 typedef double (*medfn) (int *buckets, int n_elems);
 
 int main(void) {
     int n_regions, n_cities, n_students, seed;
     
-    scanf("%d %d %d %d", &n_regions, &n_cities, &n_students, &seed);
+    if (scanf("%d %d %d %d", &n_regions, &n_cities, &n_students, &seed));
 
     srand(seed);
     
-    int scores[n_regions * n_cities * n_students];
+    int *scores = calloc(n_students * n_cities * n_regions, sizeof(int));
     for (int i = 0; i < n_regions * n_cities * n_students; i++) {
         scores[i] = rand() % 101;
-
-        printf("%d - ", scores[i]);
-
-        if ((i + 1) % n_students == 0)
-            printf("\n");
     }
 
+    int global_buckets[N_SCORES] = { 0 };
     Stats *stats = calloc(n_cities * n_regions + n_regions + 1, sizeof(Stats));
+    Stats curr_stats = { 0, INT_MAX, INT_MIN, 0, 0, 0 };
+    Avg best_city = { 0, 0 }, best_region = { 0, 0 };
 
-    int best_region = n_regions * n_cities;
-    int best_city[2] = {0, 0};
-
-    clock_t start=clock();
-
-    int buckets[N_SCORES] = { 0 };
-    Stats curr_stats;
-
+    double start= omp_get_wtime();
+    omp_set_nested(2);
 
     #pragma omp parallel for \
-            reduction(reduce_stats: curr_stats) reduction(+: buckets)
+            default(none) \
+            shared(n_regions, n_cities, n_students, scores, stats) \
+            reduction(reduce_stats: curr_stats) \
+            reduction(+: global_buckets) \
+            reduction(best: best_region) \
+            reduction(best: best_city)
     for (int i = 0; i < n_regions; i++) {
-
+        int regional_buckets[N_SCORES] = { 0 };
+        curr_stats = (Stats){ 0, INT_MAX, INT_MIN, 0, 0, 0 };
+        
         #pragma omp parallel for \
-            reduction(reduce_stats: curr_stats) reduction(+: buckets)
+            default(none) \
+            shared(n_regions, n_cities, n_students, scores, stats) \
+            firstprivate(i) \
+            reduction(reduce_stats: curr_stats) \
+            reduction(+: regional_buckets) \
+            reduction(best: best_city) 
         for (int j = 0; j < n_cities; j++) {
+            int local_buckets[N_SCORES] = { 0 };
+            curr_stats = (Stats){ 0, INT_MAX, INT_MIN, 0, 0, 0 };
+
+
             int curr_city = (i * n_cities * n_students) + (j * n_students);
 
-            counting_sort(scores, buckets, curr_city, curr_city + n_students - 1);
+            counting_sort(scores, regional_buckets, local_buckets, curr_city, curr_city + n_students - 1);
 
-            double avg = get_avg(buckets, n_students);
+            double avg = get_avg(local_buckets, n_students);
             curr_stats = (Stats){ 
                 .n = n_students, 
-                .min = get_min(buckets), 
-                .max = get_max(buckets), 
-                .med = get_median(buckets, n_students), 
+                .min = get_min(local_buckets),
+                .max = get_max(local_buckets), 
+                .med = get_median(local_buckets, n_students), 
                 .avg = avg,
-                .var = get_var(buckets, avg, n_students) 
+                .var = get_var(local_buckets, avg, n_students) 
             };
-            printf("Reg %d City %i - ", i, j);
-            print_stats(curr_stats);
-
+            
             stats[i * n_cities + j] = curr_stats;
+
+            if (curr_stats.avg > best_city.avg) {
+                best_city.avg = curr_stats.avg;
+                best_city.pos = i * n_cities + j;
+            }
         }
 
-        curr_stats.med = get_median(buckets, n_cities * n_students);
+
+        curr_stats.med = get_median(regional_buckets, n_cities * n_students);
         stats[n_regions * n_cities + i] = curr_stats;
+        
+        for (int i = 0; i < N_SCORES; i++)
+            global_buckets[i] += regional_buckets[i];
+
+        if (curr_stats.avg > best_region.avg) {
+            best_region.avg = curr_stats.avg;
+            best_region.pos = i;
+        }
     } // End of parallel section
 
-    curr_stats.med = get_median(buckets, n_regions * n_cities * n_students);
+    curr_stats.med = get_median(global_buckets, n_regions * n_cities * n_students);
     stats[n_regions * n_cities + n_regions] = curr_stats;
 
-    clock_t stop = clock();
+    double stop = omp_get_wtime();
 
-    printf("\n");
-    printf("\n");
-
+    printf("\n\n");
 
     for (int i = 0; i < n_regions; i++) {
         for (int j = 0; j < n_cities; j++) {
@@ -169,9 +207,6 @@ int main(void) {
     }
 
     for (int i = 0; i < n_regions; i++) {
-        if (stats[n_regions * n_cities + i].avg > stats[best_region].avg) {
-
-        }
         printf("Reg %d: ", i);
         print_stats(stats[n_regions * n_cities + i]);
     }
@@ -181,11 +216,13 @@ int main(void) {
     print_stats(stats[n_regions * n_cities + n_regions]);
 
     printf("\n");
-    printf("Melhor regiao: Regiao %d\n", best_region);
-    printf("Melhor cidade: Regiao %d, Cidade %d\n", best_city[0], best_city[1]);
+    printf("Melhor regiao: Regiao %d\n", best_region.pos);
+    printf("Melhor cidade: Regiao %d, Cidade %d\n", best_city.pos / n_cities, best_city.pos % n_cities);
 
     printf("\n");
-    printf("Tempo de resposta sem considerar E/S, em segundos: %.4fs\n", (double)(stop-start)/CLOCKS_PER_SEC);
+    printf("Tempo de resposta sem considerar E/S, em segundos: %.4fs\n", (double)(stop-start));
 
     free(stats);
+    free(scores);
 }
+
