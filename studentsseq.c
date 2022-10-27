@@ -61,14 +61,16 @@ double median(int *scores, int start, int end) {
 }
 
 double average(int *scores, int start, int end) {
-    int summ = 0;
-    int n_items = (end - start + 1);
+    double avg = 0;
 
+    int t = 1;
     for (int i = start; i <= end; i++) {
-        summ += scores[i] / n_items;
+        avg += (scores[i] - avg) / t;
+        
+        t++;
     }
 
-    return (double) summ / n_items;
+    return avg;
 }
 
 double std_dev(int *scores, int avg, int start, int end) {
