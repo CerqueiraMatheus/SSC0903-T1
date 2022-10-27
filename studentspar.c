@@ -146,7 +146,8 @@ int main(void) {
             reduction(reduce_stats: global_stats) \
             reduction(+: global_buckets) \
             reduction(best: best_region) \
-            reduction(best: best_city)
+            reduction(best: best_city) \
+            num_threads(4)
     for (int i = 0; i < n_regions; i++) {
         int regional_buckets[N_SCORES] = { 0 };
         Stats regional_stats = { 0, INT_MAX, INT_MIN, 0, 0, 0 };
@@ -157,7 +158,8 @@ int main(void) {
             firstprivate(i) \
             reduction(reduce_stats: regional_stats) \
             reduction(+: regional_buckets) \
-            reduction(best: best_city) 
+            reduction(best: best_city) \
+            num_threads(2)
         for (int j = 0; j < n_cities; j++) {
             int local_buckets[N_SCORES] = { 0 };
 
